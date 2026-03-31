@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>ショットクロック | Billiards</title>
+  <style>
+    /* =============================================
+       VARIABLES & RESET
+    ============================================= */
+    :root {
+      --bg:          #080c14;
+      --surface:     #0f1521;
+      --surface2:    #151d2e;
+      --border:      #1e2840;
+      --green:       #059669;
+      --green-lite:  #34d399;
+      --accent:      #6ee7b7;
+      --text:        #f1f5f9;
+      --muted:       #64748b;
+      --orange:      #f59e0b;
+      --red:         #ef4444;
+      --red-lite:    #fca5a5;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      height: 100%;
+      /* Prevent iOS bounce scroll */
+      overscroll-behavior: none;
+    }
+
+    body {
+      min-height: 100%;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+      overscroll-behavior: none;
+    }
+
+    /* =============================================
+       UNLOCK SCREEN
+    ============================================= */
+    #unlockScreen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 32px 24px;
+      text-align: center;
+    }
+
+    .unlock-ball {
+      font-size: 64px;
+      margin-bottom: 24px;
+      animation: floatBall 3s ease-in-out infinite;
+    }
+
+    @keyframes floatBall {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-10px); }
+    }
+
+    .unlock-title {
+      font-size: clamp(1.5rem, 6vw, 2rem);
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 1px;
+      line-height: 1.3;
+      margin-bottom: 14px;
+    }
+
+    .unlock-desc {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.8;
+      margin-bottom: 40px;
+      max-width: 320px;
+    }
+
+    .unlock-desc b { color: var(--text); }
+
+    #unlockBtn {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: #fff;
+      border: none;
+      padding: 20px 52px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      border-radius: 100px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      box-shadow: 0 8px 36px rgba(5, 150, 105, 0.4);
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    #unlockBtn:active { transform: scale(0.95); opacity: 0.88; }
+
+    /* =============================================
+       APP CONTAINER
+    ============================================= */
+    #app {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100dvh;
+      padding: 12px 14px 28px;
+      gap: 10px;
+      max-width: 520px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* =============================================
+       HEADER
+    ============================================= */
+    .app-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 0 4px;
+      flex-shrink: 0;
+    }
+
+    .app-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    /* Mic Indicator */
+    .mic-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.73rem;
+      color: var(--muted);
+      transition: border-color 0.3s, color 0.3s;
+      max-width: 180px;
+      overflow: hidden;
+    }
+
+    .mic-badge.listening { border-color: rgba(239,68,68,0.5); color: var(--text); }
+
+    .mic-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+
+    .mic-dot.on {
+      background: var(--red);
+      box-shadow: 0 0 8px rgba(239,68,68,0.7);
+      animation: pulseMic 1.4s ease-in-out infinite;
+    }
+
+    @keyframes pulseMic {
+      0%, 100% { transform: scale(1);   opacity: 1;   }
+      50%       { transform: scale(0.6); opacity: 0.55; }
+    }
+
+    #micLabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* =============================================
+       TIMER BOX
+    ============================================= */
+    .timer-box {
+      width: 100%;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 22px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 12px 8px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.4s;
+      flex-shrink: 0;
+    }
+
+    .timer-box.running  { border-color: rgba(52, 211, 153, 0.45); }
+    .timer-box.paused   { border-color: rgba(245, 158, 11, 0.4); }
+    .timer-box.done     { border-color: rgba(239, 68, 68, 0.6); }
+
+    /* The giant number */
+    .timer-num {
+      font-size: clamp(8rem, 44vw, 14rem);
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -4px;
+      font-family: 'Arial Black', 'Arial Bold', Arial, sans-serif;
+      color: var(--text);
+      transition: color 0.35s;
+      min-width: 1ch;
+      text-align: center;
+    }
+
+    .timer-num.warn     { color: var(--orange); }
+    .timer-num.danger   { color: var(--red); animation: flashNum 0.55s ease-in-out infinite; }
+    .timer-num.done     { color: var(--red); animation: none; }
+
+    @keyframes flashNum {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.35; }
+    }
+
+    .timer-unit {
+      font-size: 0.72rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 10px;
+    }
+
+    /* Progress bar */
+    .progress-track {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background: var(--border);
+    }
+
+    .progress-fill {
+      height: 100%;
+      transition: width 0.92s linear, background-color 0.5s;
+      border-radius: 0 3px 0 0;
+    }
+
+    /* =============================================
+       STATUS TEXT
+    ============================================= */
+    .status-line {
+      font-size: 0.83rem;
+      color: var(--muted);
+      text-align: center;
+      min-height: 22px;
+      transition: color 0.3s;
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+
+    .status-line.running  { color: var(--green-lite); font-weight: 600; }
+    .status-line.paused   { color: var(--orange); }
+    .status-line.done     { color: var(--red-lite); font-weight: 700; font-size: 0.95rem; }
+
+    /* =============================================
+       SETTINGS CARD
+    ============================================= */
+    .card {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 13px 13px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      flex-shrink: 0;
+    }
+
+    .card-lbl {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Preset buttons */
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+
+    .pst {
+      padding: 11px 4px;
+      background: var(--surface2);
+      border: 2px solid transparent;
+      color: var(--text);
+      font-size: 0.88rem;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      line-height: 1;
+    }
+
+    .pst:active  { transform: scale(0.94); opacity: 0.75; }
+    .pst.sel     { border-color: var(--green-lite); background: rgba(52,211,153,0.1); color: var(--green-lite); }
+
+    /* Custom time row */
+    .row { display: flex; gap: 8px; align-items: center; }
+
+    .num-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      color: var(--text);
+      padding: 9px 11px;
+      font-size: 0.95rem;
+      border-radius: 10px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      min-width: 0;
+    }
+
+    .num-input:focus { border-color: var(--green-lite); }
+    .num-input::placeholder { color: var(--muted); }
+
+    .sm-btn {
+      background: var(--green);
+      color: #fff;
+      border: none;
+      padding: 9px 16px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+
+    .sm-btn:active { opacity: 0.75; }
+
+    /* Mid-call buttons */
+    .mid-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 7px;
+    }
+
+    .mid-btn {
+      padding: 9px 4px;
+      background: var(--surface2);
+      border: 2px solid transparent;
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      line-height: 1.3;
+    }
+
+    .mid-btn:active { transform: scale(0.94); opacity: 0.75; }
+    .mid-btn.sel    { border-color: var(--accent); background: rgba(110,231,183,0.1); color: var(--accent); }
+
+    /* =============================================
+       CONTROL BUTTONS
+    ============================================= */
+    .controls {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 2fr 1.1fr 1.1fr;
+      gap: 9px;
+      flex-shrink: 0;
+    }
+
+    .ctrl {
+      padding: 22px 8px;
+      font-size: 1.05rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: transform 0.13s, opacity 0.13s;
+      text-align: center;
+    }
+
+    .ctrl:active:not(:disabled) { transform: scale(0.94); opacity: 0.8; }
+
+    .ctrl.start  { background: var(--green-lite); color: #022c22; }
+    .ctrl.stop   { background: var(--orange);     color: #431407; }
+    .ctrl.reset  { background: #1e293b;           color: var(--text); border: 1px solid var(--border); }
+
+    .ctrl:disabled { opacity: 0.3; pointer-events: none; }
+
+    /* =============================================
+       HINT BOXES
+    ============================================= */
+    .voice-hint {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 11px 14px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 2;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .voice-hint strong { color: var(--accent); font-size: 0.85rem; }
+
+    .sleep-hint {
+      width: 100%;
+      font-size: 0.7rem;
+      color: #334155;
+      text-align: center;
+      line-height: 1.7;
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+
+    /* =============================================
+       VOICE COMMAND FEEDBACK OVERLAY
+    ============================================= */
+    #voiceFeedback {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 21, 33, 0.92);
+      border: 2px solid var(--green-lite);
+      border-radius: 14px;
+      padding: 14px 28px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--green-lite);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s;
+      z-index: 200;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+
+    #voiceFeedback.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- =============================================
+     UNLOCK SCREEN
+============================================= -->
+<div id="unlockScreen">
+  <div class="unlock-ball">🎱</div>
+  <h1 class="unlock-title">ビリヤード<br>ショットクロック</h1>
+  <p class="unlock-desc">
+    音声操作・音声アナウンスを有効にするため、<br>
+    <b>タップして開始</b>してください。<br><br>
+    <small>マイクへのアクセス許可が求められます。<br>許可することで音声コマンドが使えます。</small>
+  </p>
+  <button id="unlockBtn" onclick="unlock()">🎤 タップして開始</button>
+</div>
+
+<!-- =============================================
+     MAIN APP
+============================================= -->
+<div id="app">
+
+  <!-- Header -->
+  <div class="app-header">
+    <span class="app-title">🎱 Shot Clock</span>
+    <div class="mic-badge" id="micBadge">
+      <div class="mic-dot" id="micDot"></div>
+      <span id="micLabel">待機中</span>
+    </div>
+  </div>
+
+  <!-- Timer Display -->
+  <div class="timer-box" id="timerBox">
+    <div class="timer-num" id="timerNum">45</div>
+    <div class="timer-unit">秒</div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"
+           style="width:100%; background-color:#34d399;"></div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-line" id="statusLine">タイマーを設定してSTARTを押してください</div>
+
+  <!-- Settings -->
+  <div class="card">
+    <span class="card-lbl">タイマー設定</span>
+
+    <!-- Preset buttons -->
+    <div class="presets">
+      <button class="pst sel" data-sec="45" onclick="pickPreset(45)">45秒</button>
+      <button class="pst"     data-sec="40" onclick="pickPreset(40)">40秒</button>
+      <button class="pst"     data-sec="30" onclick="pickPreset(30)">30秒</button>
+      <button class="pst"     data-sec="20" onclick="pickPreset(20)">20秒</button>
+    </div>
+
+    <!-- Custom time -->
+    <div class="row">
+      <input class="num-input" type="number" id="customSec"
+             placeholder="カスタム（秒）" min="5" max="600" inputmode="numeric">
+      <button class="sm-btn" onclick="pickCustom()">セット</button>
+    </div>
+
+    <span class="card-lbl">中間アナウンス</span>
+
+    <!-- Mid-call selector -->
+    <div class="mid-row">
+      <button class="mid-btn sel" data-mid="15" onclick="pickMid(15)">残り15秒</button>
+      <button class="mid-btn"     data-mid="10" onclick="pickMid(10)">残り10秒</button>
+      <button class="mid-btn"     data-mid="0"  onclick="pickMid(0)">なし</button>
+    </div>
+  </div>
+
+  <!-- Control Buttons -->
+  <div class="controls">
+    <button class="ctrl start" id="btnStart" onclick="doStart()">START</button>
+    <button class="ctrl stop"  id="btnStop"  onclick="doStop()"  disabled>STOP</button>
+    <button class="ctrl reset" id="btnReset" onclick="doReset()">RESET</button>
+  </div>
+
+  <!-- Voice Commands Hint -->
+  <div class="voice-hint">
+    🎤 音声コマンド：
+    <strong>「スタート」</strong> &nbsp;·&nbsp;
+    <strong>「ストップ」</strong> &nbsp;·&nbsp;
+    <strong>「リセット」</strong>
+  </div>
+
+  <!-- Sleep Prevention Hint -->
+  <div class="sleep-hint">
+    💡 <b>スリープ防止</b>：設定アプリ → 画面表示と明るさ（またはディスプレイ）→ 自動ロック → <b>「しない」</b> に設定してください。<br>
+    Android：設定 → ディスプレイ → スリープ → <b>「スリープしない」</b>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- Voice Feedback Overlay -->
+<div id="voiceFeedback"></div>
+
+<!-- =============================================
+     JAVASCRIPT
+============================================= -->
+<script>
+'use strict';
+
+/* --------------------------------------------------
+   STATE
+-------------------------------------------------- */
+let totalSec  = 45;   // 設定されたタイマー秒数
+let remaining = 45;   // 残り秒数
+let midCall   = 15;   // 中間アナウンス秒数 (0=なし)
+let running   = false;
+let timerId   = null;
+let midDone   = false;  // 中間アナウンス済みフラグ
+
+let audioUnlocked = false;
+let audioCtx      = null;
+
+let recog           = null;
+let recogActive     = false;
+let recogRestart    = null;
+let micStream       = null;  // getUserMedia ストリーム（権限を保持するために維持）
+
+let feedbackTimer   = null;
+let isSpeaking      = false;  // TTS 発話中フラグ（マイクへの影響対策用）
+
+/* --------------------------------------------------
+   UNLOCK  (ユーザージェスチャー起点で AudioContext / TTS を有効化)
+-------------------------------------------------- */
+function unlock() {
+  /* AudioContext 解除 */
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      audioCtx = new AC();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      /* 無音バッファを再生してコンテキストをアクティブ化 */
+      const buf = audioCtx.createBuffer(1, 1, 22050);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    }
+  } catch (e) { console.warn('AudioContext:', e); }
+
+  /* SpeechSynthesis 解除 */
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance('準備完了');
+    u.lang   = 'ja-JP';
+    u.volume = 0.75;
+    u.rate   = 1.0;
+    window.speechSynthesis.speak(u);
+  } catch (e) { console.warn('SpeechSynthesis:', e); }
+
+  audioUnlocked = true;
+
+  /* 画面切り替え */
+  document.getElementById('unlockScreen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.display        = 'flex';
+  app.style.flexDirection  = 'column';
+  app.style.alignItems     = 'center';
+  app.style.width          = '100%';
+
+  /* SpeechRecognition 起動 */
+  initRecognition();
+
+  /* iOS Safari: SpeechSynthesis が途中でフリーズするのを防ぐ keep-alive */
+  setInterval(() => {
+    if (window.speechSynthesis.paused && !isSpeaking) {
+      window.speechSynthesis.resume();
+    }
+  }, 8000);
+}
+
+/* --------------------------------------------------
+   SPEECH RECOGNITION
+-------------------------------------------------- */
+function initRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    setMicLabel('音声認識非対応', false);
+    return;
+  }
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  /* getUserMedia でマイク権限を事前取得し、ストリームを保持する。
+     ブラウザは「マイク使用中」と認識するので SpeechRecognition の
+     再起動ごとに許可ダイアログを繰り返し表示しなくなる。
+     iOS は getUserMedia が不要かつ continuous=true が不安定なため分岐する。 */
+  if (!isIOS && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        micStream = stream; // ストリームを保持しマイクを使用中に保つ
+        buildRecog(SR, false);
+      })
+      .catch(err => {
+        console.warn('getUserMedia:', err);
+        setMicLabel('マイク許可が必要', false);
+        buildRecog(SR, false); // 失敗しても SpeechRecognition は試みる
+      });
+  } else {
+    buildRecog(SR, isIOS);
+  }
+}
+
+function buildRecog(SR, isIOS) {
+  recog = new SR();
+  recog.lang            = 'ja-JP';
+  /* PC/Android: continuous=true で start() 呼び出しを最小限にし許可ダイアログを抑制。
+     iOS Safari : continuous=true が不安定なため false のまま onend ループを使用。 */
+  recog.continuous      = !isIOS;
+  recog.interimResults  = false;
+  recog.maxAlternatives = 3;
+
+  recog.onstart = () => {
+    recogActive = true;
+    setMicLabel('リスニング中', true);
+  };
+
+  recog.onend = () => {
+    recogActive = false;
+    setMicLabel('待機中', false);
+    /* 自動再起動ループ（iOS、または予期せぬ停止に備えて常時有効） */
+    if (audioUnlocked) {
+      clearTimeout(recogRestart);
+      recogRestart = setTimeout(startRecog, 350);
+    }
+  };
+
+  recog.onerror = (ev) => {
+    recogActive = false;
+    setMicLabel('待機中', false);
+
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+      setMicLabel('マイク許可が必要', false);
+      return;
+    }
+    /* その他のエラーは少し間を置いて再起動 */
+    if (audioUnlocked) {
+      clearTimeout(recogRestart);
+      recogRestart = setTimeout(startRecog, 1200);
+    }
+  };
+
+  recog.onresult = (ev) => {
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      if (ev.results[i].isFinal) {
+        /* 複数の候補をすべてチェック */
+        for (let j = 0; j < ev.results[i].length; j++) {
+          if (handleCmd(ev.results[i][j].transcript)) break;
+        }
+      }
+    }
+  };
+
+  startRecog();
+}
+
+function startRecog() {
+  if (!recog || recogActive) return;
+  try {
+    recog.start();
+  } catch (e) {
+    /* already started などの場合は少し待って再試行 */
+    setTimeout(startRecog, 500);
+  }
+}
+
+function handleCmd(rawText) {
+  const txt = rawText.trim();
+  console.log('[voice]', txt);
+
+  const isStart = /スタート|sutato|start|始め|開始/i.test(txt);
+  const isStop  = /ストップ|stop|止め|停止|とめ/i.test(txt);
+  const isReset = /リセット|reset|やり直し|やりなおし/i.test(txt);
+
+  if (isStart) { showFeedback('▶ スタート'); doStart(); return true; }
+  if (isStop)  { showFeedback('⏸ ストップ'); doStop();  return true; }
+  if (isReset) { showFeedback('↺ リセット'); doReset(); return true; }
+
+  return false;
+}
+
+function setMicLabel(txt, active) {
+  document.getElementById('micLabel').textContent = txt;
+  document.getElementById('micDot').classList.toggle('on', active);
+  document.getElementById('micBadge').classList.toggle('listening', active);
+}
+
+function showFeedback(msg) {
+  const el = document.getElementById('voiceFeedback');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(feedbackTimer);
+  feedbackTimer = setTimeout(() => el.classList.remove('show'), 1600);
+}
+
+/* --------------------------------------------------
+   SETTINGS
+-------------------------------------------------- */
+function pickPreset(sec) {
+  if (running) return;
+  totalSec  = sec;
+  remaining = sec;
+  midDone   = false;
+
+  document.querySelectorAll('.pst').forEach(b =>
+    b.classList.toggle('sel', Number(b.dataset.sec) === sec)
+  );
+  document.getElementById('customSec').value = '';
+
+  refreshDisplay();
+  setStatus(`設定: ${sec}秒 | STARTを押してください`);
+}
+
+function pickCustom() {
+  if (running) return;
+  const raw = document.getElementById('customSec').value;
+  const v   = parseInt(raw, 10);
+
+  if (!Number.isInteger(v) || v < 5 || v > 600) {
+    alert('5〜600 の整数を入力してください');
+    return;
+  }
+
+  totalSec  = v;
+  remaining = v;
+  midDone   = false;
+
+  document.querySelectorAll('.pst').forEach(b => b.classList.remove('sel'));
+
+  refreshDisplay();
+  setStatus(`設定: ${v}秒 | STARTを押してください`);
+}
+
+function pickMid(sec) {
+  midCall = sec;
+  document.querySelectorAll('.mid-btn').forEach(b =>
+    b.classList.toggle('sel', Number(b.dataset.mid) === sec)
+  );
+}
+
+/* --------------------------------------------------
+   TIMER  LOGIC
+-------------------------------------------------- */
+function doStart() {
+  if (running) return;
+  if (remaining <= 0) { doReset(); return; }
+
+  running = true;
+  midDone = false;
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled  = false;
+  document.getElementById('timerBox').className = 'timer-box running';
+
+  setStatus('カウントダウン中...', 'running');
+
+  timerId = setInterval(tick, 1000);
+}
+
+function doStop() {
+  if (!running) return;
+
+  running = false;
+  clearInterval(timerId);
+  timerId = null;
+
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled  = true;
+  document.getElementById('timerBox').className = 'timer-box paused';
+
+  setStatus('一時停止中 | STARTで再開', 'paused');
+}
+
+function doReset() {
+  running = false;
+  clearInterval(timerId);
+  timerId   = null;
+  midDone   = false;
+  remaining = totalSec;
+
+  /* 発話キューをクリア */
+  try { window.speechSynthesis.cancel(); } catch (e) {}
+
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled  = true;
+  document.getElementById('timerBox').className = 'timer-box';
+
+  refreshDisplay();
+  setStatus('リセット済み | STARTを押してください');
+}
+
+function tick() {
+  remaining--;
+  refreshDisplay();
+
+  /* ── 0秒：タイムアップ ── */
+  if (remaining <= 0) {
+    remaining = 0;
+    running   = false;
+    clearInterval(timerId);
+    timerId = null;
+
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled  = true;
+    document.getElementById('timerBox').className = 'timer-box done';
+
+    refreshDisplay();
+    setStatus('タイムアップ！', 'done');
+
+    playBuzzer();
+    /* ブザーより少し遅らせてアナウンス */
+    setTimeout(() => speak('タイムアップ'), 900);
+    return;
+  }
+
+  /* ── 中間アナウンス ── */
+  if (midCall > 0 && remaining === midCall && !midDone) {
+    midDone = true;
+    speak(`${midCall}秒前`);
+    return; /* このティックでは秒読みと重複しないよう return */
+  }
+
+  /* ── 残り5〜1秒のカウントダウン読み上げ ── */
+  if (remaining >= 1 && remaining <= 5) {
+    speak(String(remaining));
+  }
+}
+
+/* --------------------------------------------------
+   DISPLAY UPDATE
+-------------------------------------------------- */
+function refreshDisplay() {
+  const el = document.getElementById('timerNum');
+  el.textContent = remaining;
+
+  /* カラークラス */
+  el.className = 'timer-num';
+  if (remaining <= 0) {
+    el.classList.add('done');
+  } else if (remaining <= 5) {
+    el.classList.add('danger');
+  } else if (remaining <= 10) {
+    el.classList.add('warn');
+  }
+
+  /* プログレスバー */
+  const pct  = totalSec > 0 ? (remaining / totalSec) * 100 : 0;
+  const fill = document.getElementById('progressFill');
+  fill.style.width = pct + '%';
+  fill.style.backgroundColor =
+    remaining <= 5  ? '#ef4444' :
+    remaining <= 10 ? '#f59e0b' :
+                      '#34d399';
+}
+
+function setStatus(msg, cls = '') {
+  const el = document.getElementById('statusLine');
+  el.textContent = msg;
+  el.className   = 'status-line ' + cls;
+}
+
+/* --------------------------------------------------
+   SPEECH SYNTHESIS
+-------------------------------------------------- */
+function speak(text) {
+  if (!audioUnlocked) return;
+  try {
+    const u   = new SpeechSynthesisUtterance(text);
+    u.lang    = 'ja-JP';
+    u.rate    = 1.25;
+    u.pitch   = 1.0;
+    u.volume  = 1.0;
+    u.onstart = () => { isSpeaking = true; };
+    u.onend   = () => { isSpeaking = false; };
+    u.onerror = () => { isSpeaking = false; };
+    window.speechSynthesis.speak(u); /* 自動的にキューへ積まれる */
+  } catch (e) { console.warn('speak:', e); }
+}
+
+/* --------------------------------------------------
+   BUZZER  (AudioContext で生成)
+  「ピッ・ピッ・ピーーー」3音パターン
+-------------------------------------------------- */
+function playBuzzer() {
+  if (!audioCtx) return;
+
+  const doPlay = () => {
+    const t = audioCtx.currentTime;
+
+    /* [開始オフセット, 持続時間] の配列 */
+    const beeps = [
+      [0.00, 0.12],   /* 短音 1 */
+      [0.20, 0.12],   /* 短音 2 */
+      [0.42, 1.00],   /* 長音   */
+    ];
+
+    beeps.forEach(([offset, dur]) => {
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.type          = 'sawtooth'; /* ブザーらしい波形 */
+      osc.frequency.value = 880;       /* A5 */
+
+      const s = t + offset;
+      gain.gain.setValueAtTime(0,    s);
+      gain.gain.linearRampToValueAtTime(0.5, s + 0.02);
+      gain.gain.setValueAtTime(0.5,  s + dur - 0.04);
+      gain.gain.linearRampToValueAtTime(0,   s + dur);
+
+      osc.start(s);
+      osc.stop(s + dur + 0.05);
+    });
+  };
+
+  try {
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(doPlay).catch(e => console.warn('buzzer:', e));
+    } else {
+      doPlay();
+    }
+  } catch (e) { console.warn('playBuzzer:', e); }
+}
+
+/* --------------------------------------------------
+   INIT
+-------------------------------------------------- */
+refreshDisplay();
+</script>
+</body>
+</html>
