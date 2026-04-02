@@ -589,6 +589,7 @@ let micStream       = null;  // getUserMedia ストリーム（権限を保持�
 
 let feedbackTimer   = null;
 let isSpeaking      = false;  // TTS 発話中フラグ（マイクへの影響対策用）
+let lastCmdSession  = '';     // interim 重複実行防止：認識セッション内で最後に実行したコマンド
 
 /* --------------------------------------------------
    UNLOCK  (ユーザージェスチャー起点で AudioContext / TTS を有効化)
@@ -678,7 +679,7 @@ function buildRecog(SR, isIOS) {
   /* PC/Android: continuous=true で start() 呼び出しを最小限にし許可ダイアログを抑制。
      iOS Safari : continuous=true が不安定なため false のまま onend ループを使用。 */
   recog.continuous      = !isIOS;
-  recog.interimResults  = false;
+  recog.interimResults  = true;  /* interimで即度反応するため true */
   recog.maxAlternatives = 3;
 
   recog.onstart = () => {
@@ -711,13 +712,26 @@ function buildRecog(SR, isIOS) {
     }
   };
 
+  recog.onstart = () => {
+    recogActive    = true;
+    lastCmdSession = '';  /* セッション開始時にリセット */
+    setMicLabel('リスニング中', true);
+  };
+
   recog.onresult = (ev) => {
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      if (ev.results[i].isFinal) {
-        /* 複数の候補をすべてチェック */
-        for (let j = 0; j < ev.results[i].length; j++) {
-          if (handleCmd(ev.results[i][j].transcript)) break;
+      const result = ev.results[i];
+      /* isFinal・ interim の両方を判定。
+         interim は candidates[0] のみ利用可能。 */
+      const transcript = result[0].transcript;
+      if (handleCmd(transcript)) break;
+
+      /* isFinal の場合は複数候補もチェック */
+      if (result.isFinal) {
+        for (let j = 1; j < result.length; j++) {
+          if (handleCmd(result[j].transcript)) break;
         }
+        lastCmdSession = '';  /* 確定後はリセットし次の発話へ備える */
       }
     }
   };
@@ -743,11 +757,18 @@ function handleCmd(rawText) {
   const isStop  = /ストップ|stop|止め|停止|とめ/i.test(txt);
   const isReset = /リセット|reset|やり直し|やりなおし/i.test(txt);
 
-  if (isStart) { showFeedback('▶ スタート'); doStart(); return true; }
-  if (isStop)  { showFeedback('⏸ ストップ'); doStop();  return true; }
-  if (isReset) { showFeedback('↺ リセット'); doReset(); return true; }
+  const cmd = isStart ? 'start' : isStop ? 'stop' : isReset ? 'reset' : '';
+  if (!cmd) return false;
 
-  return false;
+  /* 同一認識セッション内で既に同じコマンドを実行済みなら無視（interim 重複防止） */
+  if (lastCmdSession === cmd) return true;
+  lastCmdSession = cmd;
+
+  if (isStart) { showFeedback('▶ スタート'); doStart(); }
+  if (isStop)  { showFeedback('⏸ ストップ'); doStop();  }
+  if (isReset) { showFeedback('↺ リセット'); doReset(); }
+
+  return true;
 }
 
 function setMicLabel(txt, active) {
