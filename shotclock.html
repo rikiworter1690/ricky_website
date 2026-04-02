@@ -497,7 +497,7 @@
 
   <!-- Timer Display -->
   <div class="timer-box" id="timerBox">
-    <div class="timer-num" id="timerNum">45</div>
+    <div class="timer-num" id="timerNum">20</div>
     <div class="timer-unit">秒</div>
     <div class="progress-track">
       <div class="progress-fill" id="progressFill"
@@ -514,10 +514,10 @@
 
     <!-- Preset buttons -->
     <div class="presets">
-      <button class="pst sel" data-sec="45" onclick="pickPreset(45)">45秒</button>
+      <button class="pst"     data-sec="45" onclick="pickPreset(45)">45秒</button>
       <button class="pst"     data-sec="40" onclick="pickPreset(40)">40秒</button>
       <button class="pst"     data-sec="30" onclick="pickPreset(30)">30秒</button>
-      <button class="pst"     data-sec="20" onclick="pickPreset(20)">20秒</button>
+      <button class="pst sel" data-sec="20" onclick="pickPreset(20)">20秒</button>
     </div>
 
     <!-- Custom time -->
@@ -531,8 +531,8 @@
 
     <!-- Mid-call selector -->
     <div class="mid-row">
-      <button class="mid-btn sel" data-mid="15" onclick="pickMid(15)">残り15秒</button>
-      <button class="mid-btn"     data-mid="10" onclick="pickMid(10)">残り10秒</button>
+      <button class="mid-btn"     data-mid="15" onclick="pickMid(15)">残り15秒</button>
+      <button class="mid-btn sel" data-mid="10" onclick="pickMid(10)">残り10秒</button>
       <button class="mid-btn"     data-mid="0"  onclick="pickMid(0)">なし</button>
     </div>
   </div>
@@ -572,9 +572,9 @@
 /* --------------------------------------------------
    STATE
 -------------------------------------------------- */
-let totalSec  = 45;   // 設定されたタイマー秒数
-let remaining = 45;   // 残り秒数
-let midCall   = 15;   // 中間アナウンス秒数 (0=なし)
+let totalSec  = 20;   // 設定されたタイマー秒数
+let remaining = 20;   // 残り秒数
+let midCall   = 10;   // 中間アナウンス秒数 (0=なし)
 let running   = false;
 let timerId   = null;
 let midDone   = false;  // 中間アナウンス済みフラグ
