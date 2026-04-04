@@ -764,9 +764,9 @@ function handleCmd(rawText) {
   if (lastCmdSession === cmd) return true;
   lastCmdSession = cmd;
 
-  if (isStart) { showFeedback('▶ スタート'); doStart(); }
-  if (isStop)  { showFeedback('⏸ ストップ'); doStop();  }
-  if (isReset) { showFeedback('↺ リセット'); doReset(); }
+  if (isStart) { playPip('start'); showFeedback('▶ スタート'); doStart(); }
+  if (isStop)  { playPip('stop');  showFeedback('⏸ ストップ'); doStop();  }
+  if (isReset) { playPip('reset'); showFeedback('↺ リセット'); doReset(); }
 
   return true;
 }
@@ -967,6 +967,54 @@ function speak(text) {
     u.onerror = () => { isSpeaking = false; };
     window.speechSynthesis.speak(u); /* 自動的にキューへ積まれる */
   } catch (e) { console.warn('speak:', e); }
+}
+
+/* --------------------------------------------------
+   PIP  音声コマンド応答音
+   start : 高短長（2音上昇）
+   stop  : 中低確認音（1音）
+   reset : 低下母音（1音）
+-------------------------------------------------- */
+function playPip(type) {
+  if (!audioCtx) return;
+
+  const doPlay = () => {
+    const t = audioCtx.currentTime;
+
+    /* タイプ別に和音リストを定義 [freq, offset, dur] */
+    const patterns = {
+      start: [[880, 0.00, 0.07], [1320, 0.10, 0.10]],  /* ピッピッ（上昇） */
+      stop:  [[660, 0.00, 0.12]],                        /* ピッ（中音） */
+      reset: [[440, 0.00, 0.12]],                        /* ピッ（低音） */
+    };
+
+    (patterns[type] || patterns.stop).forEach(([freq, offset, dur]) => {
+      const osc  = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.type            = 'sine';
+      osc.frequency.value = freq;
+
+      const s = t + offset;
+      gain.gain.setValueAtTime(0,    s);
+      gain.gain.linearRampToValueAtTime(0.35, s + 0.01);
+      gain.gain.setValueAtTime(0.35, s + dur - 0.02);
+      gain.gain.linearRampToValueAtTime(0,    s + dur);
+
+      osc.start(s);
+      osc.stop(s + dur + 0.02);
+    });
+  };
+
+  try {
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(doPlay).catch(e => console.warn('pip:', e));
+    } else {
+      doPlay();
+    }
+  } catch (e) { console.warn('playPip:', e); }
 }
 
 /* --------------------------------------------------
