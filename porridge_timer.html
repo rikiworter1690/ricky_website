@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>粥タイマー</title>
+    
+    <!-- スマホアプリ化（PWA化）のための設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="粥タイマー">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --text-color: #212529;
+            --card-bg: #ffffff;
+            --accent: #212529;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--card-bg);
+            padding: 30px 20px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: #6c757d;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .result-box {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+        }
+
+        .timer-value {
+            font-size: 48px;
+            font-weight: 800;
+            color: #000;
+            margin: 10px 0;
+        }
+
+        .time-label {
+            font-size: 14px;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .details {
+            font-size: 13px;
+            color: #6c757d;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>粥タイマー</h1>
+        <div class="subtitle">朝 7:45 炊き上がり設定</div>
+
+        <button class="btn" onclick="calculateTimer()">タイマーを計算する</button>
+
+        <div class="result-box" id="resultBox">
+            <div class="time-label">炊飯器のセット時間</div>
+            <div class="timer-value" id="timerOutput">ー 時間</div>
+            <div class="details" id="detailsOutput"></div>
+        </div>
+    </div>
+
+    <script>
+        function calculateTimer() {
+            const now = new Date();
+            
+            // 目標の炊き上がり時間 (翌朝の 7:45) を設定
+            let target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 45, 0);
+            
+            // もし現在時刻がすでに夜中〜朝方で、目標時間を過ぎている、または直前の場合は翌日の7:45にする
+            if (now >= target) {
+                target.setDate(target.getDate() + 1);
+            }
+            
+            // 炊飯に必要な90分（1.5時間）を引いて、「最遅の炊飯開始デッドライン」を求める
+            let maxStartTime = new Date(target.getTime() - (90 * 60 * 1000));
+            
+            // 現在から炊飯開始デッドラインまでのミリ秒
+            let diffMs = maxStartTime - now;
+            
+            // ミリ秒を時間に変換
+            let diffHours = diffMs / (1000 * 60 * 60);
+            
+            // 1時間刻みなので、デッドラインを超えないように「床切り捨て (Math.floor)」
+            let timerSetting = Math.floor(diffHours);
+            
+            const resultBox = document.getElementById('resultBox');
+            const timerOutput = document.getElementById('timerOutput');
+            const detailsOutput = document.getElementById('detailsOutput');
+
+            if (timerSetting < 0) {
+                // すでに7:45炊き上がりのデッドライン（6:15）を過ぎている場合
+                timerOutput.innerText = "今すぐ炊飯";
+                detailsOutput.innerHTML = `デッドライン（6:15）を過ぎています。<br>今すぐ普通に炊飯を開始してください。`;
+            } else {
+                // 実際に炊き上がる予定時間を逆算
+                // 炊き上がり = 現在時刻 + タイマー設定時間 + 炊飯90分
+                let expectedFinish = new Date(now.getTime() + (timerSetting * 60 * 60 * 1000) + (90 * 60 * 1000));
+                let fHours = expectedFinish.getHours();
+                let fMinutes = expectedFinish.getMinutes().toString().padStart(2, '0');
+
+                timerOutput.innerText = `${timerSetting} 時間`;
+                detailsOutput.innerHTML = `
+                    現在時刻: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}<br>
+                    <strong>朝 ${fHours}:${fMinutes}</strong> に炊き上がります。
+                `;
+            }
+
+            resultBox.classList.add('show');
+        }
+    </script>
+</body>
+</html>
